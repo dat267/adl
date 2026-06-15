@@ -6,7 +6,8 @@ DIST     := dist
 # OUT is overridden by CI: make build OUT=/path/to/binary
 OUT ?= $(BIN)
 
-# Platforms used by `make dist` for local cross-compilation
+# Platforms for local cross-compilation via `make dist`.
+# Keep in sync with the matrix in .github/workflows/release.yml.
 PLATFORMS := \
 	linux/amd64 \
 	linux/arm64 \

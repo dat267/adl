@@ -23,6 +23,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # Keep in sync with PLATFORMS in Makefile.
         goos:   [linux, darwin, windows]
         goarch: [amd64, arm64]
         include:
