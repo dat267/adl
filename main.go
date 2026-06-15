@@ -13,17 +13,62 @@ import (
 	"sync"
 )
 
-type WorkInfo struct {
-	Title  string `json:"title"`
-	Circle struct {
-		Name string `json:"name"`
-	} `json:"circle"`
+// version is set at build time via -ldflags "-X main.version=..."
+var version = "dev"
+
+// NamedEntity is a shared shape for circle, tag, and VA objects.
+type NamedEntity struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
 }
 
+// WorkInfo mirrors the full response from /api/workInfo/{id}.
+type WorkInfo struct {
+	// Core identity
+	ID    int    `json:"id"`
+	Title string `json:"title"`
+
+	// Creator
+	Circle NamedEntity `json:"circle"`
+
+	// Voice actors and tags
+	Vas  []NamedEntity `json:"vas"`
+	Tags []NamedEntity `json:"tags"`
+
+	// Artwork
+	MainCoverURL string `json:"mainCoverUrl"`
+	SamCoverURL  string `json:"samCover"`
+
+	// Release metadata
+	Release  string `json:"release"` // e.g. "2024-03-15"
+	Language string `json:"language"`
+
+	// Ratings and popularity
+	Rate      float64 `json:"rate"`
+	RateCount int     `json:"rateCount"`
+	Rank      *int    `json:"rank"`
+
+	// Pricing (in JPY)
+	Price int `json:"price"`
+
+	// Content flags
+	NSFW bool `json:"nsfw"`
+
+	// Work-level description
+	Description string `json:"detail"` // may be HTML
+}
+
+// TrackItem mirrors one node from /api/tracks/{id}?v=2.
+// Leaf nodes have MediaDownloadURL set; folder nodes have Children.
 type TrackItem struct {
 	Title            string      `json:"title"`
-	MediaDownloadURL string      `json:"mediaDownloadUrl"`
-	Children         []TrackItem `json:"children"`
+	Type             string      `json:"type"`             // "audio", "image", "text", "other"
+	MediaDownloadURL string      `json:"mediaDownloadUrl"` // present on leaf nodes
+	StreamURL        string      `json:"streamUrl"`        // HLS stream, if available
+	Duration         float64     `json:"duration"`         // seconds
+	Size             int64       `json:"size"`             // bytes
+	Hash             string      `json:"hash"`             // MD5 or similar
+	Children         []TrackItem `json:"children"`         // present on folder nodes
 }
 
 type TrackJob struct {
@@ -46,7 +91,6 @@ func extractID(input string) string {
 	if match := rjRegex.FindStringSubmatch(input); len(match) > 1 {
 		return match[1]
 	}
-	digitRegex := regexp.MustCompile(`^\d+$`)
 	if digitRegex.MatchString(input) {
 		return input
 	}
@@ -234,7 +278,8 @@ func main() {
 	}
 
 	if len(ids) == 0 {
-		fmt.Printf("Usage: %s [options] <ID or URL>...\n", filepath.Base(os.Args[0]))
+		fmt.Printf("%s %s\nUsage: %s [options] <ID or URL>...\n",
+			filepath.Base(os.Args[0]), version, filepath.Base(os.Args[0]))
 		flag.PrintDefaults()
 		os.Exit(1)
 	}
