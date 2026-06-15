@@ -41,7 +41,7 @@ func sanitize(s string) string {
 	return strings.TrimSpace(sanitizeReplacer.Replace(s))
 }
 
-func extractId(input string) string {
+func extractID(input string) string {
 	rjRegex := regexp.MustCompile(`(?i)RJ(\d+)`)
 	if match := rjRegex.FindStringSubmatch(input); len(match) > 1 {
 		return match[1]
@@ -228,7 +228,7 @@ func main() {
 
 	var ids []string
 	for _, arg := range flag.Args() {
-		if id := extractId(arg); id != "" {
+		if id := extractID(arg); id != "" {
 			ids = append(ids, id)
 		}
 	}
