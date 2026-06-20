@@ -16,8 +16,15 @@ import (
 var version = "dev"
 
 type NamedEntity struct {
-	ID   int    `json:"id"`
+	ID   any    `json:"id"`
 	Name string `json:"name"`
+}
+
+type RankEntry struct {
+	Term     string `json:"term"`
+	Category string `json:"category"`
+	Rank     int    `json:"rank"`
+	RankDate string `json:"rank_date"`
 }
 
 type WorkInfo struct {
@@ -32,7 +39,7 @@ type WorkInfo struct {
 	Language     string        `json:"language"`
 	Rate         float64       `json:"rate"`
 	RateCount    int           `json:"rateCount"`
-	Rank         *int          `json:"rank"`
+	Rank         []RankEntry   `json:"rank"`
 	Price        int           `json:"price"`
 	NSFW         bool          `json:"nsfw"`
 	Description  string        `json:"detail"`
@@ -157,6 +164,17 @@ func fetchJSON(url string, target interface{}) error {
 	return json.NewDecoder(resp.Body).Decode(target)
 }
 
+func writeInfoJSON(info WorkInfo, destPath string) error {
+	file, err := os.Create(destPath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	enc := json.NewEncoder(file)
+	enc.SetIndent("", "  ")
+	return enc.Encode(info)
+}
+
 func processWork(id, baseDownloadDir string, exclude *regexp.Regexp, preferFlac bool, sem chan struct{}) {
 	var info WorkInfo
 	if err := fetchJSON(fmt.Sprintf("https://api.asmr-200.com/api/workInfo/%s", id), &info); err != nil {
@@ -189,6 +207,20 @@ func processWork(id, baseDownloadDir string, exclude *regexp.Regexp, preferFlac 
 	}
 	workFolderName := sanitize(fmt.Sprintf("[RJ%s] %s", id, info.Title))
 	rootFolder := filepath.Join(baseDownloadDir, circleName, workFolderName)
+
+	if err := os.MkdirAll(rootFolder, 0755); err != nil {
+		fmt.Printf("! Error creating directory for RJ%s: %v\n", id, err)
+		return
+	}
+
+	infoPath := filepath.Join(rootFolder, "info.json")
+	if _, err := os.Stat(infoPath); os.IsNotExist(err) {
+		if err := writeInfoJSON(info, infoPath); err != nil {
+			fmt.Printf("! Failed to save info.json for RJ%s: %v\n", id, err)
+		} else {
+			fmt.Printf("- Saved info.json\n")
+		}
+	}
 
 	fmt.Printf("Processing RJ%s: %s\nTarget: %s\n", id, info.Title, rootFolder)
 
