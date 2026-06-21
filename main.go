@@ -82,14 +82,22 @@ func extractID(input string) string {
 	return ""
 }
 
-func extractTracks(items []TrackItem, currentPath string, exclude *regexp.Regexp, results []TrackJob) []TrackJob {
+func extractTracks(items []TrackItem, currentPath string, exclude *regexp.Regexp, excludeExts map[string]bool, results []TrackJob) []TrackJob {
 	for _, item := range items {
 		title := sanitize(item.Title)
+		
+		if len(item.Children) == 0 {
+			ext := strings.ToLower(strings.TrimPrefix(filepath.Ext(title), "."))
+			if excludeExts[ext] {
+				continue
+			}
+		}
+
 		if exclude != nil && exclude.MatchString(title) {
 			continue
 		}
 		if len(item.Children) > 0 {
-			results = extractTracks(item.Children, filepath.Join(currentPath, title), exclude, results)
+			results = extractTracks(item.Children, filepath.Join(currentPath, title), exclude, excludeExts, results)
 		} else if item.MediaDownloadURL != "" {
 			results = append(results, TrackJob{
 				FileName:     title,
@@ -175,7 +183,7 @@ func writeInfoJSON(info WorkInfo, destPath string) error {
 	return enc.Encode(info)
 }
 
-func processWork(id, baseDownloadDir string, exclude *regexp.Regexp, preferFlac bool, sem chan struct{}) {
+func processWork(id, baseDownloadDir string, exclude *regexp.Regexp, excludeExts map[string]bool, preferFlac bool, sem chan struct{}) {
 	var info WorkInfo
 	if err := fetchJSON(fmt.Sprintf("https://api.asmr-200.com/api/workInfo/%s", id), &info); err != nil {
 		fmt.Printf("! Error fetching info for RJ%s: %v\n", id, err)
@@ -200,7 +208,7 @@ func processWork(id, baseDownloadDir string, exclude *regexp.Regexp, preferFlac 
 		rawTracks = []TrackItem{singleTrack}
 	}
 
-	tracks := extractTracks(rawTracks, "", exclude, nil)
+	tracks := extractTracks(rawTracks, "", exclude, excludeExts, nil)
 	circleName := sanitize(info.Circle.Name)
 	if circleName == "" {
 		circleName = "Unknown Circle"
@@ -260,6 +268,7 @@ func processWork(id, baseDownloadDir string, exclude *regexp.Regexp, preferFlac 
 
 func main() {
 	excludePattern := flag.String("exclude", "", "Regex pattern to exclude tracks by title")
+	excludeExtStr := flag.String("exclude-ext", "", "Comma-separated list of file extensions to exclude (e.g., 'mp4,pdf,txt')")
 	customDir := flag.String("dir", "", "Custom base download directory")
 	preferFlac := flag.Bool("prefer-flac", false, "Skip downloading WAV if matching FLAC exists locally")
 	concurrency := flag.Int("concurrency", 1, "Number of concurrent file downloads")
@@ -268,6 +277,18 @@ func main() {
 	var excludeRegex *regexp.Regexp
 	if *excludePattern != "" {
 		excludeRegex = regexp.MustCompile(*excludePattern)
+	}
+
+	excludeExts := make(map[string]bool)
+	if *excludeExtStr != "" {
+		parts := strings.Split(*excludeExtStr, ",")
+		for _, p := range parts {
+			p = strings.TrimSpace(p)
+			p = strings.ToLower(strings.TrimPrefix(p, "."))
+			if p != "" {
+				excludeExts[p] = true
+			}
+		}
 	}
 
 	baseDir := *customDir
@@ -296,7 +317,7 @@ func main() {
 
 	sem := make(chan struct{}, *concurrency)
 	for _, id := range ids {
-		processWork(id, baseDir, excludeRegex, *preferFlac, sem)
+		processWork(id, baseDir, excludeRegex, excludeExts, *preferFlac, sem)
 	}
 
 	fmt.Println("All tasks complete.")

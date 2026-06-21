@@ -45,6 +45,8 @@ Options:
         Number of concurrent file downloads (default: 1)
   -exclude string
         Regex pattern to exclude tracks by title
+  -exclude-ext string
+        Comma-separated list of file extensions to exclude (e.g., 'mp4,pdf,txt')
   -prefer-flac
         Skip downloading WAV if a matching FLAC file already exists locally
 ```
@@ -66,9 +68,14 @@ adl -concurrency 4 RJ123456 RJ654321
 adl -dir "/Volumes/External/ASMR" RJ123456
 ```
 
-**Exclude specific files (e.g., skip all `.pdf` documents or specific tracks):**
+**Exclude specific file extensions (e.g., skip videos and PDFs):**
 ```bash
-adl -exclude "\.pdf$" RJ123456
+adl -exclude-ext "mp4,pdf" RJ123456
+```
+
+**Exclude specific files by title (using regex):**
+```bash
+adl -exclude "bonus track" RJ123456
 ```
 
 ## Features
